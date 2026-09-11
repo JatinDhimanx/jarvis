@@ -9,7 +9,7 @@ mode:
   prefer_offline: true
 
 vision:
-  enabled: false          # opt-in; camera stays off until explicitly enabled
+  enabled: true          # opt-in; camera stays off until explicitly enabled
   camera_index: 0
   gesture_confidence: 0.85
   cooldown_ms: 500

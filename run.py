@@ -53,6 +53,10 @@ def main() -> None:
         default=True,
         help="Use VIRTUAL/simulation backends (default, safe for demos and tests)",
     )
+
+    # Vision / Camera options
+    parser.add_argument("--camera", action="store_true", help="Explicitly enable camera and gesture tracking (overrides config)")
+    parser.add_argument("--no-camera", action="store_true", help="Explicitly disable camera and gesture tracking")
     args = parser.parse_args()
 
     print(BANNER)
@@ -73,6 +77,11 @@ def main() -> None:
 
     # 2. Load Configuration
     config = load_config()
+    if args.camera:
+        config.vision.enabled = True
+    elif args.no_camera:
+        config.vision.enabled = False
+
     print(f"[*] Configuration loaded: Wake Word='{config.jarvis.wake_word}', Privacy Opt-In: Camera={'ON' if config.vision.enabled else 'OFF'}, Mic={'ON' if config.voice.always_listen else 'OFF (Push/Wake)'}")
 
     # 3. Initialize Execution Pipeline
@@ -94,7 +103,48 @@ def main() -> None:
     hud_url = f"http://{args.host}:{args.port}/"
     print(f"[+] Tactical Web HUD online at: {hud_url}")
 
-    # 5. Open Web Browser
+    # 5. Initialize Gesture Engine if Vision enabled
+    gesture_engine = None
+    gesture_stop_event = threading.Event()
+
+    if config.vision.enabled:
+        try:
+            from jarvis.perception.gesture.engine import GestureEngine
+
+            gesture_engine = GestureEngine(config=config)
+            gesture_engine.set_camera_indicator_callback(
+                lambda active: pipeline.hud_state.set_privacy_indicators(camera=active)
+            )
+            if gesture_engine.start():
+                pipeline.hud_state.set_privacy_indicators(camera=True)
+                print("[+] Vision Engine online: Camera ACTIVE for real-time gesture tracking.")
+
+                def _gesture_loop():
+                    while not gesture_stop_event.is_set():
+                        try:
+                            if gesture_engine.camera and gesture_engine.camera.is_active:
+                                frame = gesture_engine.camera.read_frame()
+                                if frame is not None:
+                                    g_event = gesture_engine.process_frame(frame)
+                                    if g_event is not None:
+                                        print(f"\n[🖐️ GESTURE] {g_event.name} detected ({int(g_event.confidence * 100)}%)")
+                                        inp = gesture_engine.to_input_event(g_event)
+                                        res = pipeline.process_event(inp)
+                                        resp = res.get("response_text") or res.get("status")
+                                        print(f"[>] [{res.get('status', '').upper()}] {resp}")
+                                        print(f"[{pipeline.state_machine.current_state.value}] JARVIS> ", end="", flush=True)
+                        except Exception:
+                            pass
+                        time.sleep(0.033)
+
+                g_thread = threading.Thread(target=_gesture_loop, daemon=True, name="GestureWorker")
+                g_thread.start()
+            else:
+                print("[!] Vision Engine: Could not open camera device (index 0). Gestures disabled.")
+        except Exception as ex:
+            print(f"[!] Vision Engine could not be started: {ex}")
+
+    # 6. Open Web Browser
     if not args.no_browser and not args.minimized:
         try:
             webbrowser.open(hud_url)
@@ -104,7 +154,7 @@ def main() -> None:
     print("\n[!] JARVIS is ready. Type a command (e.g. 'set volume 75', 'open notepad', 'read_setting') or use the Web HUD.")
     print("[!] Type 'confirm' to accept pending actions, 'stop' for emergency stop, or 'exit' to quit.\n")
 
-    # 6. Interactive Command Loop
+    # 7. Interactive Command Loop
     try:
         while True:
             try:
@@ -159,6 +209,12 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\n[*] Interrupted by user. Exiting gracefully...")
     finally:
+        gesture_stop_event.set()
+        if gesture_engine:
+            try:
+                gesture_engine.stop()
+            except Exception:
+                pass
         hud_server.stop()
         print("[*] Tactical HUD server stopped. Goodbye.")
 
