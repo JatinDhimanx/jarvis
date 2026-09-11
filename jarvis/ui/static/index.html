@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J.A.R.V.I.S. Tactical HUD</title>
+  <link rel="stylesheet" href="index.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="hud-body">
+  <!-- Background grid & scanline overlay -->
+  <div class="hud-scanline"></div>
+  <div class="hud-grid"></div>
+
+  <header class="hud-header">
+    <div class="brand">
+      <span class="hud-logo">J.A.R.V.I.S.</span>
+      <span class="hud-sub">TACTICAL PERCEPTION & OS CONTROL</span>
+    </div>
+    <div class="privacy-status-bar">
+      <div id="cam-indicator" class="indicator-badge inactive">
+        <span class="dot"></span> CAM: <span id="cam-status">OFF</span>
+      </div>
+      <div id="mic-indicator" class="indicator-badge inactive">
+        <span class="dot"></span> MIC: <span id="mic-status">IDLE</span>
+      </div>
+      <div id="net-indicator" class="indicator-badge active">
+        <span class="dot"></span> NET: <span id="net-status">ONLINE</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="hud-main">
+    <!-- Left: Perception Stream -->
+    <section class="hud-panel left-panel">
+      <h2 class="panel-title">PERCEPTION TELEMETRY</h2>
+      <div class="telemetry-card">
+        <div class="card-label">LAST SENSOR INPUT</div>
+        <div id="last-channel" class="metric-value highlight">NONE</div>
+      </div>
+      <div class="telemetry-card">
+        <div class="card-label">RECOGNIZED PAYLOAD</div>
+        <div id="last-payload" class="metric-text">Awaiting input event...</div>
+      </div>
+      <div class="telemetry-card">
+        <div class="card-label">CONFIDENCE RATING</div>
+        <div class="confidence-bar-container">
+          <div id="confidence-bar" class="confidence-fill" style="width: 0%;"></div>
+        </div>
+        <span id="confidence-val" class="confidence-text">0.00</span>
+      </div>
+      <div class="telemetry-card">
+        <div class="card-label">RESOLVED INTENT</div>
+        <div id="resolved-intent" class="intent-badge">IDLE</div>
+      </div>
+    </section>
+
+    <!-- Center: Arc Reactor State Machine -->
+    <section class="hud-center">
+      <div class="reactor-wrapper">
+        <div id="reactor-ring-outer" class="reactor-ring outer"></div>
+        <div id="reactor-ring-mid" class="reactor-ring mid"></div>
+        <div id="reactor-ring-inner" class="reactor-ring inner"></div>
+        <div id="reactor-core" class="reactor-core state-idle">
+          <div class="core-inner">
+            <span class="core-sub">SYSTEM STATE</span>
+            <span id="current-state-text" class="core-state">IDLE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Emergency Stop Button -->
+      <div class="emergency-container">
+        <button id="btn-emergency-stop" class="btn-emergency" title="Cancel in-flight actions">
+          EMERGENCY STOP
+        </button>
+      </div>
+
+      <!-- Command Input Bar -->
+      <div class="command-bar-container">
+        <form id="command-form" class="command-form">
+          <input type="text" id="command-input" class="command-input" placeholder="Enter command (e.g. 'open notepad', 'set volume 80', 'read_setting')..." autocomplete="off" />
+          <button type="submit" id="btn-submit-cmd" class="btn-submit-cmd">EXECUTE</button>
+        </form>
+        <!-- Live response log -->
+        <div id="cmd-response-log" class="cmd-response-log">
+          <div class="cmd-log-placeholder">⬆ Submit a command above to see the response here.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right: System Diagnostics & Task Progress -->
+    <section class="hud-panel right-panel">
+      <h2 class="panel-title">SYSTEM DIAGNOSTICS</h2>
+      <div class="telemetry-card">
+        <div class="card-label">AUDIO VOLUME</div>
+        <div id="sys-volume" class="metric-value">50%</div>
+      </div>
+      <div class="telemetry-card">
+        <div class="card-label">DISPLAY BRIGHTNESS</div>
+        <div id="sys-brightness" class="metric-value">100%</div>
+      </div>
+      <div class="telemetry-card">
+        <div class="card-label">PERSISTENT MEMORIES</div>
+        <div id="sys-memories" class="metric-value">0 ITEMS</div>
+      </div>
+      <div class="telemetry-card">
+        <div class="card-label">TASK PLAN PROGRESS</div>
+        <div id="active-plan-status" class="plan-status">No active plan</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom: Action Execution Feed -->
+  <footer class="hud-footer">
+    <div class="footer-header">
+      <span class="footer-title">ACTION EXECUTION AUDIT STREAM</span>
+      <span class="contract-rule">20_DEVELOPER_CONTRACT.md VERIFIED</span>
+    </div>
+    <div id="action-feed" class="action-feed-list">
+      <div class="action-entry placeholder">Awaiting structured action execution...</div>
+    </div>
+  </footer>
+
+  <!-- Confirmation Modal -->
+  <div id="confirm-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="warning-icon">⚠</span>
+        <h3>SAFETY POLICY CONFIRMATION REQUIRED</h3>
+      </div>
+      <p id="confirm-prompt-text" class="modal-prompt">
+        An action requires explicit authorization before execution.
+      </p>
+      <div class="modal-actions">
+        <button id="btn-confirm-yes" class="btn-action confirm">AUTHORIZE & EXECUTE</button>
+        <button id="btn-confirm-no" class="btn-action cancel">REJECT & CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
