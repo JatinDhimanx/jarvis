@@ -20,6 +20,10 @@ dev = [
     "pytest>=8.0",
     "pytest-mock>=3.0",
 ]
+vision = [
+    "opencv-python>=4.8",
+    "mediapipe==0.10.14",
+]
 
 # Explicitly tell setuptools to only package the jarvis/ directory.
 # Without this, setuptools auto-discovers brain/, config/, logs/, models/
