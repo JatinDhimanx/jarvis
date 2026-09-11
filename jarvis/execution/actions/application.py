@@ -1,5 +1,6 @@
 """Application action group (LOW risk) matching 08_ACTION_ENGINE.md and 09_TOOL_REGISTRY.md."""
 
+import os
 import subprocess
 import time
 from typing import Optional, Set
@@ -7,34 +8,48 @@ from jarvis.policy.safety import RiskLevel
 from jarvis.registry.registry import Availability, ToolDeclaration, ToolRegistry
 
 
-# ── Known app aliases → Windows executable names ─────────────────────────────
+# ── Known app aliases → Windows executable names or URIs ─────────────────────
 APP_ALIASES: dict = {
-    "notepad":        "notepad.exe",
-    "calculator":     "calc.exe",
-    "calc":           "calc.exe",
-    "paint":          "mspaint.exe",
-    "mspaint":        "mspaint.exe",
-    "explorer":       "explorer.exe",
-    "wordpad":        "wordpad.exe",
-    "cmd":            "cmd.exe",
-    "command prompt": "cmd.exe",
-    "powershell":     "powershell.exe",
-    "taskmgr":        "taskmgr.exe",
-    "task manager":   "taskmgr.exe",
-    "chrome":         "chrome.exe",
-    "firefox":        "firefox.exe",
-    "edge":           "msedge.exe",
-    "vlc":            "vlc.exe",
-    "vscode":         "code.exe",
-    "vs code":        "code.exe",
-    "word":           "winword.exe",
-    "excel":          "excel.exe",
-    "spotify":        "spotify.exe",
-    "discord":        "discord.exe",
-    "snipping tool":  "SnippingTool.exe",
-    "snip":           "SnippingTool.exe",
-    "settings":       "ms-settings:",
-    "control panel":  "control.exe",
+    "notepad":          "notepad.exe",
+    "calculator":       "calc.exe",
+    "calc":             "calc.exe",
+    "paint":            "mspaint.exe",
+    "mspaint":          "mspaint.exe",
+    "explorer":         "explorer.exe",
+    "wordpad":          "wordpad.exe",
+    "cmd":              "cmd.exe",
+    "command prompt":   "cmd.exe",
+    "powershell":       "powershell.exe",
+    "taskmgr":          "taskmgr.exe",
+    "task manager":     "taskmgr.exe",
+    "chrome":           "chrome.exe",
+    "firefox":          "firefox.exe",
+    "edge":             "msedge.exe",
+    "browser":          "msedge.exe",
+    "vlc":              "vlc.exe",
+    "vscode":           "code.exe",
+    "vs code":          "code.exe",
+    "word":             "winword.exe",
+    "excel":            "excel.exe",
+    "spotify":          "spotify.exe",
+    "discord":          "discord.exe",
+    "snipping tool":    "SnippingTool.exe",
+    "snip":             "SnippingTool.exe",
+    "settings":         "ms-settings:",
+    "control panel":    "control.exe",
+    "camera":           "microsoft.windows.camera:",
+    "cam":              "microsoft.windows.camera:",
+    "webcam":           "microsoft.windows.camera:",
+    "terminal":         "wt.exe",
+    "windows terminal": "wt.exe",
+}
+
+# Process names for tasklist verification and taskkill (especially for UWP URIs)
+APP_PROCESS_NAMES: dict = {
+    "microsoft.windows.camera:": "WindowsCamera.exe",
+    "ms-settings:": "SystemSettings.exe",
+    "calc.exe": "CalculatorApp.exe",
+    "calc": "CalculatorApp.exe",
 }
 
 
@@ -104,11 +119,20 @@ class RealAppManager:
     def open_app(self, app_name: str) -> str:
         exe = _resolve_exe(app_name)
         try:
-            if exe.startswith("ms-"):
-                # URI-based apps (e.g. ms-settings:)
-                subprocess.Popen(["start", exe], shell=True)
+            if ":" in exe:
+                # Protocol/URI-based apps (e.g. ms-settings:, microsoft.windows.camera:)
+                if hasattr(os, "startfile"):
+                    os.startfile(exe)
+                else:
+                    subprocess.Popen(f'start "" "{exe}"', shell=True)
             else:
-                subprocess.Popen(exe, shell=True)
+                if hasattr(os, "startfile"):
+                    try:
+                        os.startfile(exe)
+                    except Exception:
+                        subprocess.Popen(exe, shell=True)
+                else:
+                    subprocess.Popen(exe, shell=True)
             return f"{app_name} is open."
         except FileNotFoundError:
             raise RuntimeError(f"Cannot find '{exe}'. Is it installed and on PATH?")
@@ -117,20 +141,27 @@ class RealAppManager:
 
     def verify_app_running(self, app_name: str) -> bool:
         exe = _resolve_exe(app_name)
-        if exe.startswith("ms-"):
-            return True  # URI-based — best-effort
+        proc_name = APP_PROCESS_NAMES.get(exe, exe)
+        if ":" in exe:
+            if proc_name != exe:
+                for _ in range(6):
+                    if _is_process_running(proc_name):
+                        return True
+                    time.sleep(0.5)
+            return True  # URI-based fallback — best-effort
         # Poll up to 2 s for the process to appear
         for _ in range(4):
-            if _is_process_running(exe):
+            if _is_process_running(exe) or (proc_name != exe and _is_process_running(proc_name)):
                 return True
             time.sleep(0.5)
         return False
 
     def close_app(self, app_name: str, unsaved: bool = False) -> str:
         exe = _resolve_exe(app_name)
+        target = APP_PROCESS_NAMES.get(exe, exe)
         try:
             subprocess.run(
-                ["taskkill", "/IM", exe, "/F"],
+                ["taskkill", "/IM", target, "/F"],
                 check=True, capture_output=True
             )
             return f"{app_name} is closed."
@@ -141,7 +172,8 @@ class RealAppManager:
 
     def verify_app_closed(self, app_name: str, unsaved: bool = False) -> bool:
         exe = _resolve_exe(app_name)
-        return not _is_process_running(exe)
+        target = APP_PROCESS_NAMES.get(exe, exe)
+        return not _is_process_running(target) and not _is_process_running(exe)
 
     def restart_app(self, app_name: str) -> str:
         self.close_app(app_name)

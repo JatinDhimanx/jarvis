@@ -268,3 +268,31 @@ def test_verify_lock_screen_returns_false_when_not_locked(real, monkeypatch):
 
     monkeypatch.setattr(subprocess, "run", lambda *a, **kw: FakeResult())
     assert real.verify_lock_screen() is False
+
+
+# ── RealAppManager URI & Camera App Tests ────────────────────────────────────
+
+from jarvis.execution.actions.application import RealAppManager, _resolve_exe
+
+
+def test_camera_alias_resolves():
+    """App aliases must resolve 'camera' and 'webcam' to Windows Camera URI."""
+    assert _resolve_exe("camera") == "microsoft.windows.camera:"
+    assert _resolve_exe("webcam") == "microsoft.windows.camera:"
+
+
+def test_real_app_manager_opens_camera_uri(monkeypatch):
+    """RealAppManager.open_app should invoke os.startfile with the URI."""
+    mgr = RealAppManager()
+    opened = []
+    import os
+    monkeypatch.setattr(os, "startfile", lambda path: opened.append(path), raising=False)
+    msg = mgr.open_app("camera")
+    assert "camera is open" in msg
+    assert opened == ["microsoft.windows.camera:"]
+
+
+def test_real_app_manager_verify_running_uri():
+    """verify_app_running for URI apps returns True (best-effort or process found)."""
+    mgr = RealAppManager()
+    assert mgr.verify_app_running("camera") is True
