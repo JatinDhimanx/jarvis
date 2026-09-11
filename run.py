@@ -39,6 +39,20 @@ def main() -> None:
     parser.add_argument("--no-browser", action="store_true", help="Do not automatically open browser HUD")
     parser.add_argument("--skip-diagnostics", action="store_true", help="Skip pre-flight diagnostics")
     parser.add_argument("--minimized", action="store_true", help="Run minimized/daemon mode")
+
+    # Execution mode: Virtual (default, safe demo) vs Real (actual OS control)
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--real",
+        action="store_true",
+        help="Use REAL OS backends (actually launches apps, changes volume, locks screen, etc.)",
+    )
+    mode_group.add_argument(
+        "--virtual",
+        action="store_true",
+        default=True,
+        help="Use VIRTUAL/simulation backends (default, safe for demos and tests)",
+    )
     args = parser.parse_args()
 
     print(BANNER)
@@ -62,8 +76,11 @@ def main() -> None:
     print(f"[*] Configuration loaded: Wake Word='{config.jarvis.wake_word}', Privacy Opt-In: Camera={'ON' if config.vision.enabled else 'OFF'}, Mic={'ON' if config.voice.always_listen else 'OFF (Push/Wake)'}")
 
     # 3. Initialize Execution Pipeline
-    pipeline = ExecutionPipeline(config=config)
+    use_real = args.real
+    mode_label = "REAL (live OS execution)" if use_real else "VIRTUAL (simulation / safe demo)"
+    pipeline = ExecutionPipeline(config=config, use_real_backends=use_real)
     print(f"[+] Execution Pipeline initialized. Session ID: {pipeline.session_id}")
+    print(f"[+] Execution mode : {mode_label}")
     print(f"[+] Registered Tools: {len(pipeline.registry.list_tools())} verified actions available.")
 
     # 4. Start HUD Server

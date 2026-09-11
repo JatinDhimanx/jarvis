@@ -16,14 +16,18 @@ from jarvis.execution.action_engine import (
 from jarvis.brain_layer.context import ContextManager
 from jarvis.brain_layer.hybrid_manager import HybridBrainManager
 from jarvis.brain_layer.planner import MultiStepPlanner
-from jarvis.execution.actions.application import register_application_tools, VirtualAppManager
+from jarvis.execution.actions.application import (
+    register_application_tools, VirtualAppManager, RealAppManager,
+)
 from jarvis.execution.actions.api_client import register_api_tools, ExternalAPIClient
 from jarvis.execution.actions.browser import register_browser_tools, VirtualBrowser
 from jarvis.execution.actions.files import register_file_tools, VirtualFileManager
 from jarvis.execution.actions.input import register_input_tools, VirtualInputBackend
 from jarvis.execution.actions.media import register_media_tools, VirtualMediaManager
 from jarvis.execution.actions.memory import register_memory_tools, MemoryActionManager
-from jarvis.execution.actions.system import register_system_tools, VirtualSystemBackend
+from jarvis.execution.actions.system import (
+    register_system_tools, VirtualSystemBackend, RealSystemBackend,
+)
 from jarvis.execution.actions.web_search import register_web_search_tools, WebSearchBackend
 from jarvis.execution.actions.window import register_window_tools, VirtualWindowManager
 from jarvis.memory.store import MemoryStore
@@ -45,8 +49,8 @@ class ExecutionPipeline:
     def __init__(
         self,
         config: Optional[JarvisConfig] = None,
-        system_backend: Optional[VirtualSystemBackend] = None,
-        app_manager: Optional[VirtualAppManager] = None,
+        system_backend=None,
+        app_manager=None,
         input_backend: Optional[VirtualInputBackend] = None,
         window_manager: Optional[VirtualWindowManager] = None,
         media_manager: Optional[VirtualMediaManager] = None,
@@ -60,6 +64,7 @@ class ExecutionPipeline:
         tts: Optional[Any] = None,
         settings_manager: Optional[SettingsManager] = None,
         recovery_watchdog: Optional[CrashRecoveryWatchdog] = None,
+        use_real_backends: bool = False,
     ):
         self.config = config or load_config()
         self.session_id = f"{self.config.logging.session_id_prefix}{uuid.uuid4().hex[:6]}"
@@ -77,8 +82,14 @@ class ExecutionPipeline:
         self.recovery_watchdog.recover(self.state_machine)
 
         # Register tools & storage
-        self.system_backend = system_backend or VirtualSystemBackend()
-        self.app_manager = app_manager or VirtualAppManager()
+        # When use_real_backends=True, construct real OS backends unless the caller
+        # already injected a specific backend (e.g. in tests).
+        if use_real_backends:
+            self.system_backend = system_backend or RealSystemBackend()
+            self.app_manager    = app_manager    or RealAppManager()
+        else:
+            self.system_backend = system_backend or VirtualSystemBackend()
+            self.app_manager    = app_manager    or VirtualAppManager()
         self.input_backend = input_backend or VirtualInputBackend()
         self.window_manager = window_manager or VirtualWindowManager()
         self.media_manager = media_manager or VirtualMediaManager()
@@ -91,10 +102,11 @@ class ExecutionPipeline:
         self.workflow_manager = WorkflowManager(self.memory_store)
         self.tts = tts
 
-        # Initial HUD telemetry
+        # Initial HUD telemetry — getattr guards work for both Virtual (int attrs)
+        # and Real backends (class-level int defaults, updated on each call).
         self.hud_state.update_system_status(
-            volume=self.system_backend.volume,
-            brightness=self.system_backend.brightness,
+            volume=getattr(self.system_backend, "volume", 50),
+            brightness=getattr(self.system_backend, "brightness", 70),
             network_online=True,
             memory_items=len(self.memory_store._items),
         )

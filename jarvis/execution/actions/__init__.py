@@ -2,11 +2,12 @@
 
 from jarvis.execution.actions.system import (
     VirtualSystemBackend,
+    RealSystemBackend,
     register_system_tools,
-    get_default_system_backend,
 )
 from jarvis.execution.actions.application import (
     VirtualAppManager,
+    RealAppManager,
     register_application_tools,
     get_default_app_manager,
 )
@@ -33,9 +34,10 @@ from jarvis.execution.actions.files import (
 
 __all__ = [
     "VirtualSystemBackend",
+    "RealSystemBackend",
     "register_system_tools",
-    "get_default_system_backend",
     "VirtualAppManager",
+    "RealAppManager",
     "register_application_tools",
     "get_default_app_manager",
     "VirtualInputBackend",

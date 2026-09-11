@@ -4,19 +4,30 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jarvis"
-version = "0.1.0"
+version = "1.0.0"
 description = "Personal hybrid JARVIS assistant: voice + hand-gesture input, offline-first with safety policy"
 authors = [{ name = "JARVIS Team" }]
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
+    "numpy>=1.24",
+    "requests>=2.28",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "pytest-mock>=3.0",
 ]
+
+# Explicitly tell setuptools to only package the jarvis/ directory.
+# Without this, setuptools auto-discovers brain/, config/, logs/, models/
+# (spec docs and data dirs) and refuses to build with a flat-layout error.
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["jarvis*"]
+exclude = ["brain*", "config*", "logs*", "models*", "tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
